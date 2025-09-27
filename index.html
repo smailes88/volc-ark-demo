@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>火山 Ark · 文生图 Demo</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root {
+      --primary: #0052ff;
+      --bg: #f5f7fa;
+      --card: #ffffff;
+      --radius: 8px;
+    }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+      background: var(--bg);
+      color: #333;
+    }
+    .container {
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 0 16px;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 32px;
+      font-weight: 600;
+    }
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      padding: 24px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    }
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 500;
+    }
+    input, textarea, select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #dcdfe6;
+      border-radius: var(--radius);
+      font-size: 14px;
+      margin-bottom: 16px;
+      box-sizing: border-box;
+    }
+    textarea {
+      resize: vertical;
+      min-height: 100px;
+    }
+    button {
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius);
+      padding: 10px 24px;
+      font-size: 15px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:disabled {
+      background: #a8c3ff;
+      cursor: not-allowed;
+    }
+    .result {
+      margin-top: 24px;
+      text-align: center;
+    }
+    .result img {
+      max-width: 100%;
+      border-radius: var(--radius);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+    .error {
+      color: #e53935;
+      font-size: 14px;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>火山 Ark 文生图演示</h1>
+
+    <div class="card">
+      <!-- 表单 -->
+      <label>API 密钥（Bearer Token）</label>
+      <input id="token" placeholder="1a1ac85b-d4cb-408e-8d84-c9c0e6382c37" />
+
+      <label>提示词（Prompt）</label>
+      <textarea id="prompt">星际穿越，黑洞，黑洞里冲出一辆快支离破碎的复古列车，抢视觉冲击力，电影大片，末日既视感，动感，对比色，oc渲染，光线追踪，动态模糊，景深，超现实主义，深蓝，画面通过细腻的丰富的色彩层次塑造主体与场景，质感真实，暗黑风背景的光影效果营造出氛围，整体兼具艺术幻想感，夸张的广角透视效果，耀光，反射，极致的光影，强引力，吞噬</textarea>
+
+      <label>分辨率</label>
+      <select id="size">
+        <option value="2K">2K</option>
+        <option value="1080p">1080p</option>
+        <option value="720p">720p</option>
+      </select>
+
+      <label>是否带水印</label>
+      <select id="watermark">
+        <option value="true">带水印</option>
+        <option value="false">无水印</option>
+      </select>
+
+      <button id="generateBtn" onclick="generate()">生成图片</button>
+      <div id="error" class="error"></div>
+    </div>
+
+    <!-- 结果展示区 -->
+    <div id="result" class="result" style="display:none;">
+      <h3>生成结果</h3>
+      <img id="resultImg" />
+      <p id="usage"></p>
+    </div>
+  </div>
+
+  <script>
+    async function generate() {
+      const token = document.getElementById('token').value.trim();
+      const prompt = document.getElementById('prompt').value.trim();
+      const size = document.getElementById('size').value;
+      const watermark = document.getElementById('watermark').value;
+
+      if (!token || !prompt) {
+        showError('请填写密钥和提示词');
+        return;
+      }
+
+      toggleBtn(true);
+      showError('');
+
+      const body = {
+        model: "doubao-seedream-4-0-250828",
+        prompt,
+        size,
+        sequential_image_generation: "disabled",
+        stream: false,
+        response_format: "url",
+        watermark: watermark === "true"
+      };
+
+      try {
+        const res = await fetch("/api/proxy", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify(body)
+        });
+
+        if (!res.ok) {
+          const msg = await res.text();
+          throw new Error(`HTTP ${res.status}: ${msg}`);
+        }
+
+        const data = await res.json();
+        const url = data.data?.[0]?.url;
+        if (!url) throw new Error("接口未返回图片 URL");
+
+        // 展示图片
+        document.getElementById('resultImg').src = url;
+        document.getElementById('usage').textContent =
+          `生成张数：${data.usage.generated_images}，总 tokens：${data.usage.total_tokens}`;
+        document.getElementById('result').style.display = 'block';
+      } catch (e) {
+        showError(e.message || "网络异常");
+      } finally {
+        toggleBtn(false);
+      }
+    }
+
+    function toggleBtn(loading) {
+      const btn = document.getElementById('generateBtn');
+      btn.disabled = loading;
+      btn.textContent = loading ? "生成中 …" : "生成图片";
+    }
+
+    function showError(msg) {
+      document.getElementById('error').textContent = msg;
+    }
+  </script>
+</body>
+</html>
